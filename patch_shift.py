@@ -13,7 +13,7 @@ Original Octave source:
 """
 
 from __future__ import annotations
-
+import logging
 import argparse
 from pathlib import Path
 
@@ -44,6 +44,7 @@ PARAMS = np.array([
     [5, 5, 3, 3, 10, 6, 6],
 ], dtype=int)
 
+logging.basicConfig(level=logging.INFO)
 
 def generate_shifted_patch_mask(
         x_max: int,
@@ -100,6 +101,8 @@ def run_simulation(
     nbalance = BALANCE.size
     output = np.zeros((int(np.sum(PARAMS[:, 4])) * nbalance, 22), dtype=float)
     count = 0
+
+    logging.info(f"Running simulation with parameters: {params}")
 
     for row in PARAMS:
         lx, ly, shift_x, shift_y, distribution, lambda_x, lambda_y = map(int, row)
@@ -185,6 +188,9 @@ def run_simulation(
                     count += 1
 
     save_csv(out_dir / "Summary" / "output.csv", output)
+
+    logging.info(f"Saved output to {out_dir / 'Summary' / 'output.csv'}")
+
     return output
 
 
@@ -197,9 +203,16 @@ def main() -> None:
     args = parser.parse_args()
 
     params = PCPParameters()
+
+    logging.info(f"Using parameters: {params}")
+
     out_dir = prepare_output_dir(args.outdir, args.dirname, Path(__file__))
+
+    logging.info(f"Output directory: {out_dir}")
+
     run_simulation(params, out_dir, seed=args.seed, paper_magnitude=args.paper_magnitude)
 
+    logging.info(f"Simulation completed successfully")
 
 if __name__ == "__main__":
     main()

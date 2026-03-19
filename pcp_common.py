@@ -1,4 +1,4 @@
-"""Common utilities for implementing the PCP Octave simulations to Python.
+"""Common utilities for implementing the PCP Octave simulations in Python.
 
 Credits
 -------
@@ -6,17 +6,38 @@ Mathematical model and biological study:
     Masaki Arata, Hiroshi Koyama, Toshihiko Fujimori.
     "Directional alignment of different cell types organizes planar cell polarity"
     iScience 29, 114771 (2026). DOI: 10.1016/j.isci.2026.114771.
+
+Notes
+-----
+This module preserves the original public API while providing optional
+Numba acceleration for the numerical kernels. If Numba is unavailable,
+the code falls back to pure NumPy/Python automatically.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import shutil
 from typing import Optional
+import shutil
 
 import numpy as np
 
+try:
+    from numba import njit
+    NUMBA_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    NUMBA_AVAILABLE = False
+
+    def njit(*args, **kwargs):  # type: ignore
+        def decorator(func):
+            return func
+        return decorator
+
+
+# -----------------------------------------------------------------------------
+# Public dataclasses
+# -----------------------------------------------------------------------------
 
 @dataclass(slots=True)
 class PCPParameters:
@@ -41,161 +62,6 @@ class PCPParameters:
         return self.Xmax * self.Ymax
 
 
-EDGE_VAL = np.cos(np.pi / 6.0)
-EDGE_ANGLES_X = np.array([[[-EDGE_VAL, 0.0, EDGE_VAL, EDGE_VAL, 0.0, -EDGE_VAL]]], dtype=float)
-EDGE_ANGLES_Y = np.array([[[0.5, 1.0, 0.5, -0.5, -1.0, -0.5]]], dtype=float)
-
-
-def sum2(arr: np.ndarray) -> float:
-    return float(np.sum(arr))
-
-
-# --- Periodic adjacency / neighborhood helpers ---------------------------------
-
-def seed_x(mtemp: np.ndarray, x_max: int, y_max: int) -> np.ndarray:
-    del x_max, y_max
-    shift = np.empty_like(mtemp)
-    shift[:, 0:2] = mtemp[:, -2:]
-    shift[:, 2:] = mtemp[:, :-2]
-    return (mtemp + shift >= 2).astype(float)
-
-
-def seed_y(mtemp: np.ndarray, x_max: int, y_max: int) -> np.ndarray:
-    del x_max
-    shift = np.empty_like(mtemp)
-    shift[0:2, :] = mtemp[-2:, :]
-    shift[2:, :] = mtemp[:-2, :]
-    return (mtemp + shift >= 2).astype(float)
-
-
-def grow_seed(mtemp: np.ndarray, y_max: int, x_max: int) -> np.ndarray:
-    mleft = np.zeros((y_max, x_max), dtype=float)
-    mright = np.zeros_like(mleft)
-    mup = np.zeros_like(mleft)
-    mdown = np.zeros_like(mleft)
-
-    mdown[0, :] = mtemp[-1, :]
-    mdown[1:, :] = mtemp[:-1, :]
-    r = mdown.copy()
-
-    mup[-1, :] = mtemp[0, :]
-    mup[:-1, :] = mtemp[1:, :]
-    r = r + mup
-
-    mright[:, 0] = mtemp[:, -1]
-    mright[:, 1:] = mtemp[:, :-1]
-    r[:, 1::2] = r[:, 1::2] + mright[:, 1::2]
-    mdown[0, :] = mright[-1, :]
-    mdown[1:, :] = mright[:-1, :]
-    r[:, 0::2] = r[:, 0::2] + mdown[:, 0::2]
-
-    mleft[:, -1] = mtemp[:, 0]
-    mleft[:, :-1] = mtemp[:, 1:]
-    r[:, 1::2] = r[:, 1::2] + mleft[:, 1::2]
-    mdown[0, :] = mleft[-1, :]
-    mdown[1:, :] = mleft[:-1, :]
-    r[:, 0::2] = r[:, 0::2] + mdown[:, 0::2]
-
-    mright[:, 0] = mtemp[:, -1]
-    mright[:, 1:] = mtemp[:, :-1]
-    r[:, 0::2] = r[:, 0::2] + mright[:, 0::2]
-    mup[-1, :] = mright[0, :]
-    mup[:-1, :] = mright[1:, :]
-    r[:, 1::2] = r[:, 1::2] + mup[:, 1::2]
-
-    mleft[:, -1] = mtemp[:, 0]
-    mleft[:, :-1] = mtemp[:, 1:]
-    r[:, 0::2] = r[:, 0::2] + mleft[:, 0::2]
-    mup[-1, :] = mleft[0, :]
-    mup[:-1, :] = mleft[1:, :]
-    r[:, 1::2] = r[:, 1::2] + mup[:, 1::2]
-
-    return (r + mtemp >= 7).astype(float)
-
-
-def adj_amount(mtemp: np.ndarray, x_max: int, y_max: int, bonds: int) -> np.ndarray:
-    del bonds
-    mleft = np.zeros((y_max, x_max), dtype=float)
-    mright = np.zeros_like(mleft)
-    mup = np.zeros_like(mleft)
-    mdown = np.zeros_like(mleft)
-    r = np.array(mtemp, copy=True)
-
-    mup[-1, :] = mtemp[0, :, 1]
-    mup[:-1, :] = mtemp[1:, :, 1]
-    r[:, :, 4] = mup
-
-    mdown[0, :] = mtemp[-1, :, 4]
-    mdown[1:, :] = mtemp[:-1, :, 4]
-    r[:, :, 1] = mdown
-
-    mleft[:, -1] = mtemp[:, 0, 0]
-    mleft[:, :-1] = mtemp[:, 1:, 0]
-    r[:, 0::2, 3] = mleft[:, 0::2]
-    mup[-1, :] = mleft[0, :]
-    mup[:-1, :] = mleft[1:, :]
-    r[:, 1::2, 3] = mup[:, 1::2]
-
-    mright[:, 0] = mtemp[:, -1, 2]
-    mright[:, 1:] = mtemp[:, :-1, 2]
-    r[:, 0::2, 5] = mright[:, 0::2]
-    mup[-1, :] = mright[0, :]
-    mup[:-1, :] = mright[1:, :]
-    r[:, 1::2, 5] = mup[:, 1::2]
-
-    mleft[:, -1] = mtemp[:, 0, 5]
-    mleft[:, :-1] = mtemp[:, 1:, 5]
-    r[:, 1::2, 2] = mleft[:, 1::2]
-    mdown[0, :] = mleft[-1, :]
-    mdown[1:, :] = mleft[:-1, :]
-    r[:, 0::2, 2] = mdown[:, 0::2]
-
-    mright[:, 0] = mtemp[:, -1, 3]
-    mright[:, 1:] = mtemp[:, :-1, 3]
-    r[:, 1::2, 0] = mright[:, 1::2]
-    mdown[0, :] = mright[-1, :]
-    mdown[1:, :] = mright[:-1, :]
-    r[:, 0::2, 0] = mdown[:, 0::2]
-
-    return r
-
-
-# Alias retained to mirror script 2 nomenclature.
-adj_conc = adj_amount
-
-
-def non_local(mtemp: np.ndarray, bonds: int, d_a: float) -> np.ndarray:
-    mleft = np.array(mtemp, copy=True)
-    mright = np.array(mtemp, copy=True)
-    mleft[:, :, 0] = mtemp[:, :, bonds - 1]
-    mleft[:, :, 1:bonds] = mtemp[:, :, 0:bonds - 1]
-    mright[:, :, bonds - 1] = mtemp[:, :, 0]
-    mright[:, :, 0:bonds - 1] = mtemp[:, :, 1:bonds]
-    return d_a * (mleft + mright) + mtemp
-
-
-# --- Initial conditions / metrics ------------------------------------------------
-
-def initialize_unidirectional_state(
-        high: np.ndarray,
-        params: PCPParameters,
-        rng: np.random.Generator,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    fzdmem = np.zeros((params.Ymax, params.Xmax, params.Bonds), dtype=float)
-    vanglmem = np.zeros_like(fzdmem)
-    fzdmem[:, :, 2] = 0.6
-    fzdmem[:, :, 3] = 0.6
-    vanglmem[:, :, 0] = 0.6
-    vanglmem[:, :, 5] = 0.6
-    fzdmem = fzdmem + params.noise * rng.random(fzdmem.shape)
-    vanglmem = vanglmem + params.noise * rng.random(vanglmem.shape)
-    fzdint = high * (params.Total_protein - np.sum(fzdmem, axis=2))
-    vanglint = high * (params.Total_protein - np.sum(vanglmem, axis=2))
-    fzdmem = high[:, :, None] * fzdmem
-    vanglmem = high[:, :, None] * vanglmem
-    return fzdmem, vanglmem, fzdint, vanglint
-
-
 @dataclass(slots=True)
 class PCPMetrics:
     cv_all: float
@@ -213,112 +79,453 @@ class PCPMetrics:
     n_high: float
 
 
-def compute_metrics(
-        fzdmem: np.ndarray,
-        high_calc: np.ndarray,
-        params: PCPParameters,
-        *,
-        divide_angles_as_in_script2: bool = False,
-        normalize_magnitude_as_in_paper: bool = False,
-) -> PCPMetrics:
-    vx = np.sum(EDGE_ANGLES_X * fzdmem, axis=2)
-    vy = np.sum(EDGE_ANGLES_Y * fzdmem, axis=2)
-    angle = np.arctan2(vy, vx)
+# -----------------------------------------------------------------------------
+# Constants
+# -----------------------------------------------------------------------------
 
-    if normalize_magnitude_as_in_paper:
-        denom = np.sum(fzdmem, axis=2)
-        denom = np.where(denom == 0.0, 1.0, denom)
-        magnitude = np.sqrt(vx ** 2 + vy ** 2) / denom
-    else:
-        magnitude = np.sqrt(vx ** 2 + vy ** 2)
+EDGE_VAL = np.cos(np.pi / 6.0)
+EDGE_ANGLES_X = np.array(
+    [[[-EDGE_VAL, 0.0, EDGE_VAL, EDGE_VAL, 0.0, -EDGE_VAL]]],
+    dtype=np.float64,
+)
+EDGE_ANGLES_Y = np.array(
+    [[[0.5, 1.0, 0.5, -0.5, -1.0, -0.5]]],
+    dtype=np.float64,
+)
 
-    allx = sum2(np.cos(angle))
-    ally = sum2(np.sin(angle))
-    highx = sum2(np.cos(angle) * high_calc)
-    highy = sum2(np.sin(angle) * high_calc)
-    low_mask = np.abs(1.0 - high_calc)
-    lowx = sum2(np.cos(angle) * low_mask)
-    lowy = sum2(np.sin(angle) * low_mask)
-    n_high = sum2(high_calc)
-    n_low = params.cell_N - n_high
 
-    def safe_div(num: float, den: float) -> float:
-        return float(num / den) if den != 0 else np.nan
+# -----------------------------------------------------------------------------
+# Small helpers
+# -----------------------------------------------------------------------------
 
-    mean_angle_all = float(np.arctan2(ally, allx))
-    mean_angle_high = float(np.arctan2(highy, highx))
-    mean_angle_low = float(np.arctan2(lowy, lowx)) if n_low != 0 else np.nan
+def sum2(arr: np.ndarray) -> float:
+    return float(np.sum(arr))
+
+
+@njit(cache=True, nogil=True)
+def _sum2_jit(arr: np.ndarray) -> float:
+    total = 0.0
+    for i in range(arr.shape[0]):
+        for j in range(arr.shape[1]):
+            total += arr[i, j]
+    return total
+
+
+# -----------------------------------------------------------------------------
+# Periodic adjacency / neighborhood helpers
+# -----------------------------------------------------------------------------
+
+@njit(cache=True, nogil=True)
+def _seed_x_jit(mtemp: np.ndarray) -> np.ndarray:
+    y_max, x_max = mtemp.shape
+    out = np.empty((y_max, x_max), dtype=np.float64)
+    for y in range(y_max):
+        for x in range(x_max):
+            src_x = x - 2
+            if src_x < 0:
+                src_x += x_max
+            out[y, x] = 1.0 if (mtemp[y, x] + mtemp[y, src_x]) >= 2.0 else 0.0
+    return out
+
+
+def seed_x(mtemp: np.ndarray, x_max: int, y_max: int) -> np.ndarray:
+    del x_max, y_max
+    return _seed_x_jit(np.asarray(mtemp, dtype=np.float64))
+
+
+@njit(cache=True, nogil=True)
+def _seed_y_jit(mtemp: np.ndarray) -> np.ndarray:
+    y_max, x_max = mtemp.shape
+    out = np.empty((y_max, x_max), dtype=np.float64)
+    for y in range(y_max):
+        src_y = y - 2
+        if src_y < 0:
+            src_y += y_max
+        for x in range(x_max):
+            out[y, x] = 1.0 if (mtemp[y, x] + mtemp[src_y, x]) >= 2.0 else 0.0
+    return out
+
+
+def seed_y(mtemp: np.ndarray, x_max: int, y_max: int) -> np.ndarray:
+    del x_max, y_max
+    return _seed_y_jit(np.asarray(mtemp, dtype=np.float64))
+
+
+@njit(cache=True, nogil=True)
+def _grow_seed_jit(mtemp: np.ndarray) -> np.ndarray:
+    y_max, x_max = mtemp.shape
+    r = np.zeros((y_max, x_max), dtype=np.float64)
+
+    for y in range(y_max):
+        ym1 = y - 1 if y > 0 else y_max - 1
+        yp1 = y + 1 if y < y_max - 1 else 0
+
+        for x in range(x_max):
+            xm1 = x - 1 if x > 0 else x_max - 1
+            xp1 = x + 1 if x < x_max - 1 else 0
+
+            total = 0.0
+
+            # up/down
+            total += mtemp[ym1, x]
+            total += mtemp[yp1, x]
+
+            # parity-dependent hex neighbors
+            if x % 2 == 0:
+                total += mtemp[y, xm1]
+                total += mtemp[y, xp1]
+                total += mtemp[ym1, xm1]
+                total += mtemp[ym1, xp1]
+            else:
+                total += mtemp[y, xm1]
+                total += mtemp[y, xp1]
+                total += mtemp[yp1, xm1]
+                total += mtemp[yp1, xp1]
+
+            # original code uses (r + mtemp >= 7)
+            out_val = total + mtemp[y, x]
+            r[y, x] = 1.0 if out_val >= 7.0 else 0.0
+
+    return r
+
+
+def grow_seed(mtemp: np.ndarray, y_max: int, x_max: int) -> np.ndarray:
+    del y_max, x_max
+    return _grow_seed_jit(np.asarray(mtemp, dtype=np.float64))
+
+
+@njit(cache=True, nogil=True)
+def _adj_amount_jit(mtemp: np.ndarray) -> np.ndarray:
+    y_max, x_max, bonds = mtemp.shape
+    r = np.empty((y_max, x_max, bonds), dtype=np.float64)
+
+    # start from copy
+    for y in range(y_max):
+        for x in range(x_max):
+            for b in range(bonds):
+                r[y, x, b] = mtemp[y, x, b]
+
+    # bond 5 <- shifted bond 2 upward
+    for y in range(y_max):
+        src_y = y + 1 if y < y_max - 1 else 0
+        for x in range(x_max):
+            r[y, x, 4] = mtemp[src_y, x, 1]
+
+    # bond 2 <- shifted bond 5 downward
+    for y in range(y_max):
+        src_y = y - 1 if y > 0 else y_max - 1
+        for x in range(x_max):
+            r[y, x, 1] = mtemp[src_y, x, 4]
+
+    # bond 4 from bond 1 of left neighbor, with parity adjustment
+    for y in range(y_max):
+        ym1 = y - 1 if y > 0 else y_max - 1
+        for x in range(x_max):
+            xp1 = x + 1 if x < x_max - 1 else 0
+            if x % 2 == 0:
+                r[y, x, 3] = mtemp[y, xp1, 0]
+            else:
+                r[y, x, 3] = mtemp[ym1, xp1, 0]
+
+    # bond 6 from bond 3 of right neighbor, with parity adjustment
+    for y in range(y_max):
+        ym1 = y - 1 if y > 0 else y_max - 1
+        for x in range(x_max):
+            xm1 = x - 1 if x > 0 else x_max - 1
+            if x % 2 == 0:
+                r[y, x, 5] = mtemp[y, xm1, 2]
+            else:
+                r[y, x, 5] = mtemp[ym1, xm1, 2]
+
+    # bond 3 from bond 6 of left-ish neighbor, with parity adjustment
+    for y in range(y_max):
+        yp1 = y + 1 if y < y_max - 1 else 0
+        for x in range(x_max):
+            xp1 = x + 1 if x < x_max - 1 else 0
+            if x % 2 == 0:
+                r[y, x, 2] = mtemp[yp1, xp1, 5]
+            else:
+                r[y, x, 2] = mtemp[y, xp1, 5]
+
+    # bond 1 from bond 4 of right-ish neighbor, with parity adjustment
+    for y in range(y_max):
+        yp1 = y + 1 if y < y_max - 1 else 0
+        for x in range(x_max):
+            xm1 = x - 1 if x > 0 else x_max - 1
+            if x % 2 == 0:
+                r[y, x, 0] = mtemp[yp1, xm1, 3]
+            else:
+                r[y, x, 0] = mtemp[y, xm1, 3]
+
+    return r
+
+
+def adj_amount(mtemp: np.ndarray, x_max: int, y_max: int, bonds: int) -> np.ndarray:
+    del x_max, y_max, bonds
+    return _adj_amount_jit(np.asarray(mtemp, dtype=np.float64))
+
+
+adj_conc = adj_amount
+
+
+@njit(cache=True, nogil=True)
+def _non_local_jit(mtemp: np.ndarray, d_a: float) -> np.ndarray:
+    y_max, x_max, bonds = mtemp.shape
+    out = np.empty((y_max, x_max, bonds), dtype=np.float64)
+
+    for y in range(y_max):
+        for x in range(x_max):
+            for b in range(bonds):
+                left = b - 1 if b > 0 else bonds - 1
+                right = b + 1 if b < bonds - 1 else 0
+                out[y, x, b] = d_a * (mtemp[y, x, left] + mtemp[y, x, right]) + mtemp[y, x, b]
+
+    return out
+
+
+def non_local(mtemp: np.ndarray, bonds: int, d_a: float) -> np.ndarray:
+    del bonds
+    return _non_local_jit(np.asarray(mtemp, dtype=np.float64), float(d_a))
+
+
+# -----------------------------------------------------------------------------
+# Initial conditions / metrics
+# -----------------------------------------------------------------------------
+
+def initialize_unidirectional_state(
+    high: np.ndarray,
+    params: PCPParameters,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    fzdmem = np.zeros((params.Ymax, params.Xmax, params.Bonds), dtype=np.float64)
+    vanglmem = np.zeros_like(fzdmem)
+
+    fzdmem[:, :, 2] = 0.6
+    fzdmem[:, :, 3] = 0.6
+    vanglmem[:, :, 0] = 0.6
+    vanglmem[:, :, 5] = 0.6
+
+    fzdmem += params.noise * rng.random(fzdmem.shape)
+    vanglmem += params.noise * rng.random(vanglmem.shape)
+
+    fzdint = high * (params.Total_protein - np.sum(fzdmem, axis=2))
+    vanglint = high * (params.Total_protein - np.sum(vanglmem, axis=2))
+
+    fzdmem = high[:, :, None] * fzdmem
+    vanglmem = high[:, :, None] * vanglmem
+
+    return fzdmem, vanglmem, fzdint, vanglint
+
+
+@njit(cache=True, nogil=True)
+def _compute_metrics_jit(
+    fzdmem: np.ndarray,
+    high_calc: np.ndarray,
+    cell_n: int,
+    divide_angles_as_in_script2: bool,
+    normalize_magnitude_as_in_paper: bool,
+) -> tuple[float, float, float, float, float, float, float, float, float, float, float, float, float]:
+    y_max, x_max, bonds = fzdmem.shape
+
+    allx = 0.0
+    ally = 0.0
+    highx = 0.0
+    highy = 0.0
+    lowx = 0.0
+    lowy = 0.0
+    n_high = 0.0
+
+    sum_abs_angle_all = 0.0
+    sum_abs_angle_high = 0.0
+    sum_abs_angle_low = 0.0
+
+    sum_mag_all = 0.0
+    sum_mag_high = 0.0
+    sum_mag_low = 0.0
+
+    for y in range(y_max):
+        for x in range(x_max):
+            vx = 0.0
+            vy = 0.0
+            denom = 0.0
+            for b in range(bonds):
+                val = fzdmem[y, x, b]
+                vx += EDGE_ANGLES_X[0, 0, b] * val
+                vy += EDGE_ANGLES_Y[0, 0, b] * val
+                denom += val
+
+            angle = np.arctan2(vy, vx)
+            mag = np.sqrt(vx * vx + vy * vy)
+            if normalize_magnitude_as_in_paper:
+                if denom == 0.0:
+                    denom = 1.0
+                mag = mag / denom
+
+            c = np.cos(angle)
+            s = np.sin(angle)
+
+            allx += c
+            ally += s
+            sum_abs_angle_all += abs(angle)
+            sum_mag_all += mag
+
+            h = high_calc[y, x]
+            l = abs(1.0 - h)
+            n_high += h
+
+            highx += c * h
+            highy += s * h
+            lowx += c * l
+            lowy += s * l
+
+            sum_abs_angle_high += abs(angle) * h
+            sum_abs_angle_low += abs(angle) * l
+
+            sum_mag_high += mag * h
+            sum_mag_low += mag * l
+
+    n_low = float(cell_n) - n_high
+
+    mean_angle_all = np.arctan2(ally, allx)
+    mean_angle_high = np.arctan2(highy, highx)
+    mean_angle_low = np.nan if n_low == 0.0 else np.arctan2(lowy, lowx)
 
     if divide_angles_as_in_script2:
-        mean_angle_all = safe_div(mean_angle_all, params.cell_N)
-        mean_angle_high = safe_div(mean_angle_high, n_high)
-        mean_angle_low = safe_div(mean_angle_low, n_low) if n_low != 0 else np.nan
+        mean_angle_all = mean_angle_all / float(cell_n)
+        mean_angle_high = np.nan if n_high == 0.0 else mean_angle_high / n_high
+        mean_angle_low = np.nan if n_low == 0.0 else mean_angle_low / n_low
 
-    return PCPMetrics(
-        cv_all=1.0 - np.sqrt(allx ** 2 + ally ** 2) / params.cell_N,
-        cv_high=1.0 - np.sqrt(highx ** 2 + highy ** 2) / n_high if n_high != 0 else np.nan,
-        cv_low=1.0 - np.sqrt(lowx ** 2 + lowy ** 2) / n_low if n_low != 0 else np.nan,
-        mean_del_angle_all=sum2(np.abs(angle)) / params.cell_N,
-        mean_del_angle_high=sum2(np.abs(angle) * high_calc) / n_high if n_high != 0 else np.nan,
-        mean_del_angle_low=sum2(np.abs(angle) * low_mask) / n_low if n_low != 0 else np.nan,
-        mean_angle_all=mean_angle_all,
-        mean_angle_high=mean_angle_high,
-        mean_angle_low=mean_angle_low,
-        mean_magnitude_all=sum2(magnitude) / params.cell_N,
-        mean_magnitude_high=sum2(magnitude * high_calc) / n_high if n_high != 0 else np.nan,
-        mean_magnitude_low=sum2(magnitude * low_mask) / n_low if n_low != 0 else np.nan,
-        n_high=n_high,
+    cv_all = 1.0 - np.sqrt(allx * allx + ally * ally) / float(cell_n)
+    cv_high = np.nan if n_high == 0.0 else 1.0 - np.sqrt(highx * highx + highy * highy) / n_high
+    cv_low = np.nan if n_low == 0.0 else 1.0 - np.sqrt(lowx * lowx + lowy * lowy) / n_low
+
+    mean_del_angle_all = sum_abs_angle_all / float(cell_n)
+    mean_del_angle_high = np.nan if n_high == 0.0 else sum_abs_angle_high / n_high
+    mean_del_angle_low = np.nan if n_low == 0.0 else sum_abs_angle_low / n_low
+
+    mean_magnitude_all = sum_mag_all / float(cell_n)
+    mean_magnitude_high = np.nan if n_high == 0.0 else sum_mag_high / n_high
+    mean_magnitude_low = np.nan if n_low == 0.0 else sum_mag_low / n_low
+
+    return (
+        cv_all,
+        cv_high,
+        cv_low,
+        mean_del_angle_all,
+        mean_del_angle_high,
+        mean_del_angle_low,
+        mean_angle_all,
+        mean_angle_high,
+        mean_angle_low,
+        mean_magnitude_all,
+        mean_magnitude_high,
+        mean_magnitude_low,
+        n_high,
     )
 
 
-# --- Dynamics -------------------------------------------------------------------
+def compute_metrics(
+    fzdmem: np.ndarray,
+    high_calc: np.ndarray,
+    params: PCPParameters,
+    *,
+    divide_angles_as_in_script2: bool = False,
+    normalize_magnitude_as_in_paper: bool = False,
+) -> PCPMetrics:
+    vals = _compute_metrics_jit(
+        np.asarray(fzdmem, dtype=np.float64),
+        np.asarray(high_calc, dtype=np.float64),
+        params.cell_N,
+        divide_angles_as_in_script2,
+        normalize_magnitude_as_in_paper,
+    )
+    return PCPMetrics(*vals)
 
-def run_until_convergence(
-        fzdmem: np.ndarray,
-        vanglmem: np.ndarray,
-        fzdint: np.ndarray,
-        vanglint: np.ndarray,
-        params: PCPParameters,
+
+# -----------------------------------------------------------------------------
+# Dynamics
+# -----------------------------------------------------------------------------
+
+@njit(cache=True, nogil=True)
+def _run_until_convergence_jit(
+    fzdmem: np.ndarray,
+    vanglmem: np.ndarray,
+    fzdint: np.ndarray,
+    vanglint: np.ndarray,
+    dt: float,
+    rho: float,
+    mu: float,
+    phai: float,
+    omega: float,
+    d_a: float,
+    d_i: float,
+    thr: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     convergence = 20000.0
     t = 0
-    while convergence > params.thr:
-        fzdmem_adj = adj_amount(fzdmem, params.Xmax, params.Ymax, params.Bonds)
-        vanglmem_adj = adj_amount(vanglmem, params.Xmax, params.Ymax, params.Bonds)
 
-        del_fzdmem = (params.rho + params.omega * non_local(fzdmem * vanglmem_adj, params.Bonds, params.Da)) * fzdint[
-            :, :, None]
-        del_fzdmem = del_fzdmem - (
-                    params.mu + params.phai * non_local(vanglmem * fzdmem_adj, params.Bonds, params.Di)) * fzdmem
+    while convergence > thr:
+        fzdmem_adj = _adj_amount_jit(fzdmem)
+        vanglmem_adj = _adj_amount_jit(vanglmem)
 
-        del_vanglmem = (params.rho + params.omega * non_local(vanglmem * fzdmem_adj, params.Bonds, params.Da)) * \
-                       vanglint[:, :, None]
-        del_vanglmem = del_vanglmem - (
-                    params.mu + params.phai * non_local(fzdmem * vanglmem_adj, params.Bonds, params.Di)) * vanglmem
+        term1 = _non_local_jit(fzdmem * vanglmem_adj, d_a)
+        term2 = _non_local_jit(vanglmem * fzdmem_adj, d_i)
+        del_fzdmem = (rho + omega * term1) * fzdint[:, :, None] - (mu + phai * term2) * fzdmem
+
+        term3 = _non_local_jit(vanglmem * fzdmem_adj, d_a)
+        term4 = _non_local_jit(fzdmem * vanglmem_adj, d_i)
+        del_vanglmem = (rho + omega * term3) * vanglint[:, :, None] - (mu + phai * term4) * vanglmem
 
         del_fzdint = -np.sum(del_fzdmem, axis=2)
         del_vanglint = -np.sum(del_vanglmem, axis=2)
 
-        fzdmem = fzdmem + params.dt * del_fzdmem
-        vanglmem = vanglmem + params.dt * del_vanglmem
-        fzdint = fzdint + params.dt * del_fzdint
-        vanglint = vanglint + params.dt * del_vanglint
+        fzdmem = fzdmem + dt * del_fzdmem
+        vanglmem = vanglmem + dt * del_vanglmem
+        fzdint = fzdint + dt * del_fzdint
+        vanglint = vanglint + dt * del_vanglint
 
+        convergence = np.max(np.abs(del_fzdint))
         t += 1
-        convergence = float(np.max(np.abs(del_fzdint)))
 
     return fzdmem, vanglmem, fzdint, vanglint, t
 
 
-# --- I/O ------------------------------------------------------------------------
+def run_until_convergence(
+    fzdmem: np.ndarray,
+    vanglmem: np.ndarray,
+    fzdint: np.ndarray,
+    vanglint: np.ndarray,
+    params: PCPParameters,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    return _run_until_convergence_jit(
+        np.asarray(fzdmem, dtype=np.float64),
+        np.asarray(vanglmem, dtype=np.float64),
+        np.asarray(fzdint, dtype=np.float64),
+        np.asarray(vanglint, dtype=np.float64),
+        float(params.dt),
+        float(params.rho),
+        float(params.mu),
+        float(params.phai),
+        float(params.omega),
+        float(params.Da),
+        float(params.Di),
+        float(params.thr),
+    )
+
+
+# -----------------------------------------------------------------------------
+# I/O
+# -----------------------------------------------------------------------------
 
 def prepare_output_dir(base_dir: Path, dirname: str, source_script: Optional[Path] = None) -> Path:
     out_dir = base_dir / dirname
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "Summary").mkdir(exist_ok=True)
     (out_dir / "Data").mkdir(exist_ok=True)
+
     if source_script is not None and source_script.exists():
         shutil.copy2(source_script, out_dir / source_script.name)
+
     return out_dir
 
 

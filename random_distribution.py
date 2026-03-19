@@ -21,6 +21,7 @@ Consistency notes
 
 from __future__ import annotations
 
+import logging
 import argparse
 from pathlib import Path
 
@@ -44,6 +45,7 @@ FREQ_HIGH = np.array([
     0.8, 0.85, 0.9, 0.95,
 ], dtype=float)
 
+logging.basicConfig(level=logging.INFO)
 
 def generate_random_high_mask(ymax: int, xmax: int, ratio_high: float, rng: np.random.Generator) -> np.ndarray:
     high = rng.random((ymax, xmax))
@@ -78,6 +80,8 @@ def run_simulation(
     nfreq_high = FREQ_HIGH.size
     output = np.zeros((params.nREP * nfreq_high * nbalance, 14), dtype=float)
     count = 0
+
+    logging.info(f"Running simulation with parameters: {params}")
 
     for ratio_high in FREQ_HIGH:
         ratio_low = 1.0 - ratio_high
@@ -135,6 +139,7 @@ def run_simulation(
                     count += 1
 
     save_csv(out_dir / "Summary" / "output.csv", output)
+    logging.info(f"Saved output to {out_dir / 'Summary' / 'output.csv'}")
     return output
 
 
@@ -148,7 +153,9 @@ def main() -> None:
     args = parser.parse_args()
 
     params = PCPParameters()
+    logging.info(f"Using parameters: {params}")
     out_dir = prepare_output_dir(args.outdir, args.dirname, Path(__file__))
+    logging.info(f"Output directory: {out_dir}")
     run_simulation(
         params,
         out_dir,
@@ -156,7 +163,7 @@ def main() -> None:
         legacy_script2_angle_scaling=args.legacy_script2_angle_scaling,
         paper_magnitude=args.paper_magnitude,
     )
-
+    logging.info(f"Simulation completed. Results saved to {out_dir}")
 
 if __name__ == "__main__":
     main()
