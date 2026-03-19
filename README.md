@@ -6,7 +6,6 @@
 - DOI: 10.1016/j.isci.2026.114771.
 - Octave scripts: Masaki Arata, Hiroshi Koyama, Toshihiko Fujimori.
 - DOI: https://doi.org/10.1016/j.isci.2026.114771
--
 
 ## Reproducibility and consistency
 
