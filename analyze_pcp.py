@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 # --------- CONFIG ---------
-INPUT = "output.csv"
+INPUT = "Random_test_python/Summary/output.csv"
 OUTDIR = Path("plots")
 OUTDIR.mkdir(exist_ok=True)
 
