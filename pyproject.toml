@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcp-python-implementation"
+version = "0.1.0"
+description = "Python implementation of the Arata et al. planar cell polarity simulation scripts."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Abhinav Mishra" }
+]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6.0",
+]
+
+[project.scripts]
+pcp-random = "random_distribution:main"
+pcp-patch-shift = "patch_shift:main"
+
+[tool.setuptools]
+py-modules = ["pcp_common", "random_distribution", "patch_shift"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "ruff>=0.6.0",
+]
