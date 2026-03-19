@@ -447,6 +447,79 @@ def compute_metrics(
 # -----------------------------------------------------------------------------
 
 @njit(cache=True, nogil=True)
+def _adj_amount_inplace(src: np.ndarray, out: np.ndarray) -> None:
+    y_max, x_max, bonds = src.shape
+
+    for y in range(y_max):
+        for x in range(x_max):
+            for b in range(bonds):
+                out[y, x, b] = src[y, x, b]
+
+    # out[:, :, 4] = shifted src[:, :, 1] upward
+    for y in range(y_max):
+        src_y = y + 1 if y < y_max - 1 else 0
+        for x in range(x_max):
+            out[y, x, 4] = src[src_y, x, 1]
+
+    # out[:, :, 1] = shifted src[:, :, 4] downward
+    for y in range(y_max):
+        src_y = y - 1 if y > 0 else y_max - 1
+        for x in range(x_max):
+            out[y, x, 1] = src[src_y, x, 4]
+
+    # out[:, :, 3]
+    for y in range(y_max):
+        ym1 = y - 1 if y > 0 else y_max - 1
+        for x in range(x_max):
+            xp1 = x + 1 if x < x_max - 1 else 0
+            if x % 2 == 0:
+                out[y, x, 3] = src[y, xp1, 0]
+            else:
+                out[y, x, 3] = src[ym1, xp1, 0]
+
+    # out[:, :, 5]
+    for y in range(y_max):
+        ym1 = y - 1 if y > 0 else y_max - 1
+        for x in range(x_max):
+            xm1 = x - 1 if x > 0 else x_max - 1
+            if x % 2 == 0:
+                out[y, x, 5] = src[y, xm1, 2]
+            else:
+                out[y, x, 5] = src[ym1, xm1, 2]
+
+    # out[:, :, 2]
+    for y in range(y_max):
+        yp1 = y + 1 if y < y_max - 1 else 0
+        for x in range(x_max):
+            xp1 = x + 1 if x < x_max - 1 else 0
+            if x % 2 == 0:
+                out[y, x, 2] = src[yp1, xp1, 5]
+            else:
+                out[y, x, 2] = src[y, xp1, 5]
+
+    # out[:, :, 0]
+    for y in range(y_max):
+        yp1 = y + 1 if y < y_max - 1 else 0
+        for x in range(x_max):
+            xm1 = x - 1 if x > 0 else x_max - 1
+            if x % 2 == 0:
+                out[y, x, 0] = src[yp1, xm1, 3]
+            else:
+                out[y, x, 0] = src[y, xm1, 3]
+
+
+@njit(cache=True, nogil=True)
+def _non_local_inplace(src: np.ndarray, d_a: float, out: np.ndarray) -> None:
+    y_max, x_max, bonds = src.shape
+    for y in range(y_max):
+        for x in range(x_max):
+            for b in range(bonds):
+                left = b - 1 if b > 0 else bonds - 1
+                right = b + 1 if b < bonds - 1 else 0
+                out[y, x, b] = d_a * (src[y, x, left] + src[y, x, right]) + src[y, x, b]
+
+
+@njit(cache=True, nogil=True)
 def _run_until_convergence_jit(
     fzdmem: np.ndarray,
     vanglmem: np.ndarray,
@@ -461,30 +534,83 @@ def _run_until_convergence_jit(
     d_i: float,
     thr: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    y_max, x_max, bonds = fzdmem.shape
+
+    # Preallocated work buffers
+    fzdmem_adj = np.empty_like(fzdmem)
+    vanglmem_adj = np.empty_like(vanglmem)
+
+    tmp_mul_1 = np.empty_like(fzdmem)
+    tmp_mul_2 = np.empty_like(fzdmem)
+
+    nl_pos_fzd = np.empty_like(fzdmem)
+    nl_neg_fzd = np.empty_like(fzdmem)
+    nl_pos_vangl = np.empty_like(vanglmem)
+    nl_neg_vangl = np.empty_like(vanglmem)
+
+    del_fzdmem = np.empty_like(fzdmem)
+    del_vanglmem = np.empty_like(vanglmem)
+    del_fzdint = np.empty_like(fzdint)
+    del_vanglint = np.empty_like(vanglint)
+
     convergence = 20000.0
     t = 0
 
     while convergence > thr:
-        fzdmem_adj = _adj_amount_jit(fzdmem)
-        vanglmem_adj = _adj_amount_jit(vanglmem)
+        _adj_amount_inplace(fzdmem, fzdmem_adj)
+        _adj_amount_inplace(vanglmem, vanglmem_adj)
 
-        term1 = _non_local_jit(fzdmem * vanglmem_adj, d_a)
-        term2 = _non_local_jit(vanglmem * fzdmem_adj, d_i)
-        del_fzdmem = (rho + omega * term1) * fzdint[:, :, None] - (mu + phai * term2) * fzdmem
+        # tmp_mul_1 = fzdmem * vanglmem_adj
+        # tmp_mul_2 = vanglmem * fzdmem_adj
+        for y in range(y_max):
+            for x in range(x_max):
+                for b in range(bonds):
+                    tmp_mul_1[y, x, b] = fzdmem[y, x, b] * vanglmem_adj[y, x, b]
+                    tmp_mul_2[y, x, b] = vanglmem[y, x, b] * fzdmem_adj[y, x, b]
 
-        term3 = _non_local_jit(vanglmem * fzdmem_adj, d_a)
-        term4 = _non_local_jit(fzdmem * vanglmem_adj, d_i)
-        del_vanglmem = (rho + omega * term3) * vanglint[:, :, None] - (mu + phai * term4) * vanglmem
+        _non_local_inplace(tmp_mul_1, d_a, nl_pos_fzd)   # nonLocal(fzdmem * vanglmemAdj, Da)
+        _non_local_inplace(tmp_mul_2, d_i, nl_neg_fzd)   # nonLocal(vanglmem * fzdmemAdj, Di)
+        _non_local_inplace(tmp_mul_2, d_a, nl_pos_vangl) # nonLocal(vanglmem * fzdmemAdj, Da)
+        _non_local_inplace(tmp_mul_1, d_i, nl_neg_vangl) # nonLocal(fzdmem * vanglmemAdj, Di)
 
-        del_fzdint = -np.sum(del_fzdmem, axis=2)
-        del_vanglint = -np.sum(del_vanglmem, axis=2)
+        convergence = 0.0
 
-        fzdmem = fzdmem + dt * del_fzdmem
-        vanglmem = vanglmem + dt * del_vanglmem
-        fzdint = fzdint + dt * del_fzdint
-        vanglint = vanglint + dt * del_vanglint
+        for y in range(y_max):
+            for x in range(x_max):
+                sum_df = 0.0
+                sum_dv = 0.0
+                f_int = fzdint[y, x]
+                v_int = vanglint[y, x]
 
-        convergence = np.max(np.abs(del_fzdint))
+                for b in range(bonds):
+                    df = (rho + omega * nl_pos_fzd[y, x, b]) * f_int - (
+                        mu + phai * nl_neg_fzd[y, x, b]
+                    ) * fzdmem[y, x, b]
+
+                    dv = (rho + omega * nl_pos_vangl[y, x, b]) * v_int - (
+                        mu + phai * nl_neg_vangl[y, x, b]
+                    ) * vanglmem[y, x, b]
+
+                    del_fzdmem[y, x, b] = df
+                    del_vanglmem[y, x, b] = dv
+                    sum_df += df
+                    sum_dv += dv
+
+                del_fzdint[y, x] = -sum_df
+                del_vanglint[y, x] = -sum_dv
+
+                abs_dfint = abs(del_fzdint[y, x])
+                if abs_dfint > convergence:
+                    convergence = abs_dfint
+
+        for y in range(y_max):
+            for x in range(x_max):
+                fzdint[y, x] += dt * del_fzdint[y, x]
+                vanglint[y, x] += dt * del_vanglint[y, x]
+                for b in range(bonds):
+                    fzdmem[y, x, b] += dt * del_fzdmem[y, x, b]
+                    vanglmem[y, x, b] += dt * del_vanglmem[y, x, b]
+
         t += 1
 
     return fzdmem, vanglmem, fzdint, vanglint, t
