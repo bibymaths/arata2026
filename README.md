@@ -1,5 +1,7 @@
 # Python implementation of the Arata et al. PCP simulations
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19424946.svg)](https://doi.org/10.5281/zenodo.19424946)
+
 Python reimplementation of the planar cell polarity (PCP) simulations described in Arata et al., preserving the original Octave logic while explicitly documenting deviations required for reproducibility.
 
 ## Credits

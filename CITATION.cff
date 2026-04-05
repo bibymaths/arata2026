@@ -3,6 +3,7 @@ message: "If you use this software, please cite both the software and the Arata 
 title: "Python implementation of the Arata et al. PCP simulations"
 type: software
 version: "0.1.0"
+doi: "https://doi.org/10.5281/zenodo.19424946"
 license: "MIT"
 abstract: >
   Python implementation of the Arata et al. planar cell polarity simulation scripts,
