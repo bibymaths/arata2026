@@ -370,19 +370,19 @@ def _compute_metrics_jit(
             sum_mag_all += mag
 
             h = high_calc[y, x]
-            l = abs(1.0 - h)
+            lo = abs(1.0 - h)
             n_high += h
 
             highx += c * h
             highy += s * h
-            lowx += c * l
-            lowy += s * l
+            lowx += c * lo
+            lowy += s * lo
 
             sum_abs_angle_high += abs(angle) * h
-            sum_abs_angle_low += abs(angle) * l
+            sum_abs_angle_low += abs(angle) * lo
 
             sum_mag_high += mag * h
-            sum_mag_low += mag * l
+            sum_mag_low += mag * lo
 
     n_low = float(cell_n) - n_high
 

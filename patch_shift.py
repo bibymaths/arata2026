@@ -29,8 +29,7 @@ from pcp_common import (
     run_until_convergence,
     save_csv,
     seed_x,
-    seed_y,
-    sum2,
+    seed_y
 )
 
 BALANCE = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], dtype=float)
@@ -218,7 +217,7 @@ def main() -> None:
 
     run_simulation(params, out_dir, seed=args.seed, paper_magnitude=args.paper_magnitude)
 
-    logging.info(f"Simulation completed successfully")
+    logging.info("Simulation completed successfully")
 
 if __name__ == "__main__":
     main()
