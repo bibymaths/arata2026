@@ -17,6 +17,7 @@ dependencies = [
     "numba>=0.64.0",
     "numpy>=1.26",
     "pandas>=2.2",
+    "tqdm>=4.67.3",
 ]
 
 [project.optional-dependencies]

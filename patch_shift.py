@@ -18,6 +18,7 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+from tqdm import tqdm
 
 from pcp_common import (
     PCPParameters,
@@ -104,6 +105,9 @@ def run_simulation(
 
     logging.info(f"Running simulation with parameters: {params}")
 
+    total = int(np.sum(PARAMS[:, 4])) * len(BALANCE) * params.noise_rep
+    pbar = tqdm(total=total, desc="Simulations")
+
     for row in PARAMS:
         lx, ly, shift_x, shift_y, distribution, lambda_x, lambda_y = map(int, row)
 
@@ -186,7 +190,9 @@ def run_simulation(
                     output[count, 21] = rep2
                     _ = n_low
                     count += 1
+                    pbar.update(1)
 
+    pbar.close()
     save_csv(out_dir / "Summary" / "output.csv", output)
 
     logging.info(f"Saved output to {out_dir / 'Summary' / 'output.csv'}")

@@ -26,6 +26,7 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+from tqdm import tqdm
 
 from pcp_common import (
     PCPParameters,
@@ -83,6 +84,9 @@ def run_simulation(
 
     logging.info(f"Running simulation with parameters: {params}")
 
+    total = len(FREQ_HIGH) * params.nREP * len(BALANCE) * params.noise_rep
+    pbar = tqdm(total=total, desc="Simulations")
+
     for ratio_high in FREQ_HIGH:
         ratio_low = 1.0 - ratio_high
         for rep1 in range(1, params.nREP + 1):
@@ -137,7 +141,9 @@ def run_simulation(
                     output[count, 12] = metrics.n_high
                     output[count, 13] = low_conc
                     count += 1
+                    pbar.update(1)
 
+    pbar.close()
     save_csv(out_dir / "Summary" / "output.csv", output)
     logging.info(f"Saved output to {out_dir / 'Summary' / 'output.csv'}")
     return output
