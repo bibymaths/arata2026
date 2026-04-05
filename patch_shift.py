@@ -27,6 +27,7 @@ from pcp_common import (
     grow_seed,
     initialize_unidirectional_state,
     prepare_output_dir,
+    print_logo,
     run_until_convergence,
     save_csv,
     seed_x,
@@ -236,4 +237,16 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    print_logo(
+        name="PCP Python",
+        version="0.1.0",
+        tagline="Python implementation of the Arata et al. PCP simulations",
+        author="Abhinav Mishra",
+        email="mishraabhinav36@gmail.com",
+        orcid="0009-0005-3179-7408",
+        website="bibymaths.github.io",
+        font="slant",
+        color="bright_green",
+        animate=True,
+    )
     main()

@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the Arata et al. paper."
+title: "Python implementation of the Arata et al. PCP simulations"
+type: software
+version: "0.1.0"
+license: "MIT"
+abstract: >
+  Python implementation of the Arata et al. planar cell polarity simulation scripts,
+  preserving the Octave update rules and periodic-neighborhood logic while documenting
+  explicit handling of reproducibility and consistency differences between the paper and
+  the original scripts.
+authors:
+  - family-names: "Mishra"
+    given-names: "Abhinav"
+    email: "mishraabhiav36@gmail.com"
+    orcid: "https://orcid.org/0009-0005-3179-7408"
+    affiliation: "Independent"
+    alias: "bibymaths"
+repository-code: "https://github.com/bibymaths"
+url: "https://bibymaths.github.io"
+keywords:
+  - "planar cell polarity"
+  - "PCP"
+  - "simulation"
+  - "computational biology"
+  - "bioinformatics"
+  - "reproducible research"
+  - "python"
+license: "MIT"
+preferred-citation:
+  type: article
+  title: "Arata et al. planar cell polarity model"
+  authors:
+    - family-names: "Arata"
+      given-names: "Masaki"
+    - family-names: "Koyama"
+      given-names: "Hiroshi"
+    - family-names: "Fujimori"
+      given-names: "Toshihiko"
+  doi: "10.1016/j.isci.2026.114771"
+
+references:
+  - type: article
+    title: "Arata et al. planar cell polarity model"
+    authors:
+      - family-names: "Arata"
+        given-names: "Masaki"
+      - family-names: "Koyama"
+        given-names: "Hiroshi"
+      - family-names: "Fujimori"
+        given-names: "Toshihiko"
+    doi: "10.1016/j.isci.2026.114771"

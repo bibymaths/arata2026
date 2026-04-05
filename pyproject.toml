@@ -10,13 +10,15 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Abhinav Mishra" }
+    { name = "Abhinav Mishra", email = "mishraabhiav36@gmail.com"}
 ]
 dependencies = [
     "matplotlib>=3.10.8",
     "numba>=0.64.0",
     "numpy>=1.26",
     "pandas>=2.2",
+    "pyfiglet>=1.0.4",
+    "rich>=14.3.3",
     "tqdm>=4.67.3",
 ]
 

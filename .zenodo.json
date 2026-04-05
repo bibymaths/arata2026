@@ -1,0 +1,71 @@
+{
+  "upload_type": "software",
+  "publication_date": "2026-03-31",
+  "title": "Python implementation of the Arata et al. PCP simulations",
+  "description": "<p>Python implementation of the Arata et al. planar cell polarity (PCP) simulation scripts.</p><p>This implementation preserves the Octave update rules and periodic-neighborhood logic. For reproducibility and consistency, explicit handling was added for differences between the published paper and the original scripts:</p><ul><li><code>Arata_et_al_random</code> divides mean angles by the number of cells, but Script 1 and the paper do not. The Python implementation defaults to the paper-consistent behavior. Use <code>--legacy-script2-angle-scaling</code> to reproduce Script 2 exactly.</li><li>The paper defines polarity magnitude as <code>sqrt(Fx^2 + Fy^2) / sum(FM_i)</code>, but both Octave scripts omit the denominator. The Python implementation keeps the script behavior by default and offers <code>--paper-magnitude</code> as an option.</li><li><code>Arata_et_al_random</code> allocates some temporary arrays with <code>(Xmax, Ymax)</code> instead of <code>(Ymax, Xmax)</code>. Because the published runs use 24 x 24, the bug is masked there. The Python implementation fixes it.</li></ul><p>Usage:</p><pre><code>python random_distribution.py --outdir . --dirname Random_test_python\npython patch_shift.py --outdir . --dirname patch_shift_python\n\npython random_distribution.py --legacy-script2-angle-scaling\npython random_distribution.py --paper-magnitude\npython patch_shift.py --paper-magnitude</code></pre>",
+  "access_right": "open",
+  "license": "MIT",
+  "doi": "",
+  "prereserve_doi": true,
+  "keywords": [
+    "planar cell polarity",
+    "PCP",
+    "computational biology",
+    "simulation",
+    "Python",
+    "reproducible research"
+  ],
+  "notes": "Python reimplementation of the Arata et al. PCP simulations with documented handling of paper-versus-script discrepancies for reproducibility.",
+  "version": "0.1.0",
+  "language": "eng",
+  "creators": [
+    {
+      "name": "Mishra, Abhinav",
+      "affiliation": "Independent Researcher, Berlin, Germany",
+      "orcid": "0009-0005-3179-7408"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Arata, Masaki",
+      "type": "Researcher"
+    },
+    {
+      "name": "Koyama, Hiroshi",
+      "type": "Researcher"
+    },
+    {
+      "name": "Fujimori, Toshihiko",
+      "type": "Researcher"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://doi.org/10.1016/j.isci.2026.114771",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article"
+    }
+  ],
+  "subjects": [
+    {
+      "term": "Bioinformatics",
+      "identifier": "http://id.loc.gov/authorities/subjects/sh90001880",
+      "scheme": "url"
+    },
+    {
+      "term": "Systems Biology"
+    },
+    {
+      "term": "Computational Biology"
+    }
+  ],
+  "dates": [
+    {
+      "start": "2026-01-01",
+      "end": "2026-03-31",
+      "type": "Collected",
+      "description": "Software development period"
+    }
+  ],
+  "method": "<p>Software developed in Python to reproduce and document the planar cell polarity simulations described by Arata, Koyama, and Fujimori, while preserving Octave update rules and periodic-neighborhood logic and explicitly documenting implementation choices required for reproducibility.</p>"
+}
