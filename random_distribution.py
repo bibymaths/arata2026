@@ -21,8 +21,8 @@ Consistency notes
 
 from __future__ import annotations
 
-import logging
 import argparse
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -39,16 +39,37 @@ from pcp_common import (
 )
 
 BALANCE = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], dtype=float)
-FREQ_HIGH = np.array([
-    0.05, 0.1, 0.15, 0.2, 0.25,
-    0.3, 0.35, 0.4, 0.45, 0.5,
-    0.55, 0.6, 0.65, 0.7, 0.75,
-    0.8, 0.85, 0.9, 0.95,
-], dtype=float)
+FREQ_HIGH = np.array(
+    [
+        0.05,
+        0.1,
+        0.15,
+        0.2,
+        0.25,
+        0.3,
+        0.35,
+        0.4,
+        0.45,
+        0.5,
+        0.55,
+        0.6,
+        0.65,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        0.95,
+    ],
+    dtype=float,
+)
 
 logging.basicConfig(level=logging.INFO)
 
-def generate_random_high_mask(ymax: int, xmax: int, ratio_high: float, rng: np.random.Generator) -> np.ndarray:
+
+def generate_random_high_mask(
+    ymax: int, xmax: int, ratio_high: float, rng: np.random.Generator
+) -> np.ndarray:
     high = rng.random((ymax, xmax))
     v_l = 0.0
     v_h = 1.0
@@ -69,12 +90,12 @@ def generate_random_high_mask(ymax: int, xmax: int, ratio_high: float, rng: np.r
 
 
 def run_simulation(
-        params: PCPParameters,
-        out_dir: Path,
-        seed: int = 0,
-        *,
-        legacy_script2_angle_scaling: bool = False,
-        paper_magnitude: bool = False,
+    params: PCPParameters,
+    out_dir: Path,
+    seed: int = 0,
+    *,
+    legacy_script2_angle_scaling: bool = False,
+    paper_magnitude: bool = False,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
     nbalance = BALANCE.size
@@ -95,14 +116,20 @@ def run_simulation(
                 high = high_calc + low_conc * np.abs(1.0 - high_calc)
                 for rep2 in range(1, params.noise_rep + 1):
                     t0 = 0
-                    fzdmem, vanglmem, fzdint, vanglint = initialize_unidirectional_state(high, params, rng)
+                    fzdmem, vanglmem, fzdint, vanglint = initialize_unidirectional_state(
+                        high, params, rng
+                    )
 
                     fname = f"{low_conc}_Lfreq{ratio_low}_noiseRep{rep2}_rep{rep1}_t{t0}.csv"
                     save_csv(out_dir / "Data" / f"HIGH_LOW{fname}", high_calc)
-                    save_csv(out_dir / "Data" / f"Fzdmem_LOW{fname}",
-                             fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds))
-                    save_csv(out_dir / "Data" / f"Vanglmem_LOW{fname}",
-                             vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds))
+                    save_csv(
+                        out_dir / "Data" / f"Fzdmem_LOW{fname}",
+                        fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
+                    save_csv(
+                        out_dir / "Data" / f"Vanglmem_LOW{fname}",
+                        vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
                     save_csv(out_dir / "Data" / f"Fzdint_LOW{fname}", fzdint)
                     save_csv(out_dir / "Data" / f"Vanglint_LOW{fname}", vanglint)
 
@@ -111,10 +138,14 @@ def run_simulation(
                     )
 
                     fname = f"{low_conc}_Lfreq{ratio_low}_noiseRep{rep2}_rep{rep1}_t{t_final}.csv"
-                    save_csv(out_dir / "Data" / f"Fzdmem_LOW{fname}",
-                             fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds))
-                    save_csv(out_dir / "Data" / f"Vanglmem_LOW{fname}",
-                             vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds))
+                    save_csv(
+                        out_dir / "Data" / f"Fzdmem_LOW{fname}",
+                        fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
+                    save_csv(
+                        out_dir / "Data" / f"Vanglmem_LOW{fname}",
+                        vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
                     save_csv(out_dir / "Data" / f"Fzdint_LOW{fname}", fzdint)
                     save_csv(out_dir / "Data" / f"Vanglint_LOW{fname}", vanglint)
 
@@ -170,6 +201,7 @@ def main() -> None:
         paper_magnitude=args.paper_magnitude,
     )
     logging.info(f"Simulation completed. Results saved to {out_dir}")
+
 
 if __name__ == "__main__":
     main()

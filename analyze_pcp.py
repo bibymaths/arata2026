@@ -1,8 +1,8 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 # --------- CONFIG ---------
 INPUT = "Random_test_python/Summary/output.csv"
@@ -17,22 +17,46 @@ df = pd.read_csv(INPUT, header=None)
 if df.shape[1] == 22:
     mode = "patch"
     df.columns = [
-        "cv_all","cv_high","cv_low",
-        "ang_all","ang_high","ang_low",
-        "dir_all","dir_high","dir_low",
-        "mag_all","mag_high","mag_low",
+        "cv_all",
+        "cv_high",
+        "cv_low",
+        "ang_all",
+        "ang_high",
+        "ang_low",
+        "dir_all",
+        "dir_high",
+        "dir_low",
+        "mag_all",
+        "mag_high",
+        "mag_low",
         "n_high",
-        "lx","ly","shiftX","shiftY","lambdaX","lambdaY",
-        "low_conc","rep1","rep2"
+        "lx",
+        "ly",
+        "shiftX",
+        "shiftY",
+        "lambdaX",
+        "lambdaY",
+        "low_conc",
+        "rep1",
+        "rep2",
     ]
 else:
     mode = "random"
     df.columns = [
-        "cv_all","cv_high","cv_low",
-        "ang_all","ang_high","ang_low",
-        "dir_all","dir_high","dir_low",
-        "mag_all","mag_high","mag_low",
-        "n_high","low_conc"
+        "cv_all",
+        "cv_high",
+        "cv_low",
+        "ang_all",
+        "ang_high",
+        "ang_low",
+        "dir_all",
+        "dir_high",
+        "dir_low",
+        "mag_all",
+        "mag_high",
+        "mag_low",
+        "n_high",
+        "low_conc",
     ]
 
 
@@ -111,7 +135,6 @@ savefig("correlation")
 
 # --------- PATCH-SPECIFIC ----------
 if mode == "patch":
-
     # cluster size vs CV
     size = df["lx"] * df["ly"]
     plt.scatter(size, df["cv_all"], s=10)
@@ -146,7 +169,6 @@ if mode == "patch":
 
 # --------- RANDOM-SPECIFIC ----------
 if mode == "random":
-
     # fraction high vs CV
     frac_high = df["n_high"] / df["n_high"].max()
     plt.scatter(frac_high, df["cv_all"], s=10)

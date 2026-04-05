@@ -13,8 +13,9 @@ Original Octave source:
 """
 
 from __future__ import annotations
-import logging
+
 import argparse
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -29,33 +30,37 @@ from pcp_common import (
     run_until_convergence,
     save_csv,
     seed_x,
-    seed_y
+    seed_y,
 )
 
 BALANCE = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], dtype=float)
-PARAMS = np.array([
-    [3, 3, 0, 0, 1, 4, 4],
-    [3, 3, 1, 1, 10, 4, 4],
-    [3, 3, 2, 2, 10, 4, 4],
-    [3, 3, 3, 3, 10, 4, 4],
-    [5, 5, 0, 0, 1, 6, 6],
-    [5, 5, 1, 1, 10, 6, 6],
-    [5, 5, 2, 2, 10, 6, 6],
-    [5, 5, 3, 3, 10, 6, 6],
-], dtype=int)
+PARAMS = np.array(
+    [
+        [3, 3, 0, 0, 1, 4, 4],
+        [3, 3, 1, 1, 10, 4, 4],
+        [3, 3, 2, 2, 10, 4, 4],
+        [3, 3, 3, 3, 10, 4, 4],
+        [5, 5, 0, 0, 1, 6, 6],
+        [5, 5, 1, 1, 10, 6, 6],
+        [5, 5, 2, 2, 10, 6, 6],
+        [5, 5, 3, 3, 10, 6, 6],
+    ],
+    dtype=int,
+)
 
 logging.basicConfig(level=logging.INFO)
 
+
 def generate_shifted_patch_mask(
-        x_max: int,
-        y_max: int,
-        lx: int,
-        ly: int,
-        shift_x: int,
-        shift_y: int,
-        lambda_x: int,
-        lambda_y: int,
-        rng: np.random.Generator,
+    x_max: int,
+    y_max: int,
+    lx: int,
+    ly: int,
+    shift_x: int,
+    shift_y: int,
+    lambda_x: int,
+    lambda_y: int,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     n_patch_x = x_max // lambda_x
     n_patch_y = y_max // lambda_y
@@ -91,11 +96,11 @@ def generate_shifted_patch_mask(
 
 
 def run_simulation(
-        params: PCPParameters,
-        out_dir: Path,
-        seed: int = 0,
-        *,
-        paper_magnitude: bool = False,
+    params: PCPParameters,
+    out_dir: Path,
+    seed: int = 0,
+    *,
+    paper_magnitude: bool = False,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
     nbalance = BALANCE.size
@@ -127,17 +132,23 @@ def run_simulation(
                 high = high_calc + low_conc * np.abs(1.0 - high_calc)
                 for rep2 in range(1, params.noise_rep + 1):
                     t0 = 0
-                    fzdmem, vanglmem, fzdint, vanglint = initialize_unidirectional_state(high, params, rng)
+                    fzdmem, vanglmem, fzdint, vanglint = initialize_unidirectional_state(
+                        high, params, rng
+                    )
 
                     fname = (
                         f"{lx}_Y{ly}_sX{shift_x}_sY{shift_y}_delX{lambda_x}_delY{lambda_y}"
                         f"_low{low_conc}_noiseRep{rep2}_rep{rep1}_t{t0}.csv"
                     )
                     save_csv(out_dir / "Data" / f"HIGH_patchX{fname}", high_calc)
-                    save_csv(out_dir / "Data" / f"Fzdmem_patchX{fname}",
-                             fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds))
-                    save_csv(out_dir / "Data" / f"Vanglmem_patchX{fname}",
-                             vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds))
+                    save_csv(
+                        out_dir / "Data" / f"Fzdmem_patchX{fname}",
+                        fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
+                    save_csv(
+                        out_dir / "Data" / f"Vanglmem_patchX{fname}",
+                        vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
                     save_csv(out_dir / "Data" / f"Fzdint_patchX{fname}", fzdint)
                     save_csv(out_dir / "Data" / f"Vanglint_patchX{fname}", vanglint)
 
@@ -149,10 +160,14 @@ def run_simulation(
                         f"{lx}_Y{ly}_sX{shift_x}_sY{shift_y}_delX{lambda_x}_delY{lambda_y}"
                         f"_low{low_conc}_noiseRep{rep2}_rep{rep1}_t{t_final}.csv"
                     )
-                    save_csv(out_dir / "Data" / f"Fzdmem_patchX{fname}",
-                             fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds))
-                    save_csv(out_dir / "Data" / f"Vanglmem_patchX{fname}",
-                             vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds))
+                    save_csv(
+                        out_dir / "Data" / f"Fzdmem_patchX{fname}",
+                        fzdmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
+                    save_csv(
+                        out_dir / "Data" / f"Vanglmem_patchX{fname}",
+                        vanglmem.reshape(params.Ymax * params.Xmax, params.Bonds),
+                    )
                     save_csv(out_dir / "Data" / f"Fzdint_patchX{fname}", fzdint)
                     save_csv(out_dir / "Data" / f"Vanglint_patchX{fname}", vanglint)
 
@@ -218,6 +233,7 @@ def main() -> None:
     run_simulation(params, out_dir, seed=args.seed, paper_magnitude=args.paper_magnitude)
 
     logging.info("Simulation completed successfully")
+
 
 if __name__ == "__main__":
     main()
