@@ -16,15 +16,15 @@ the code falls back to pure NumPy/Python automatically.
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-import shutil
 
 import numpy as np
 
 try:
     from numba import njit
+
     NUMBA_AVAILABLE = True
 except ImportError:  # pragma: no cover
     NUMBA_AVAILABLE = False
@@ -32,12 +32,14 @@ except ImportError:  # pragma: no cover
     def njit(*args, **kwargs):  # type: ignore
         def decorator(func):
             return func
+
         return decorator
 
 
 # -----------------------------------------------------------------------------
 # Public dataclasses
 # -----------------------------------------------------------------------------
+
 
 @dataclass(slots=True)
 class PCPParameters:
@@ -98,6 +100,7 @@ EDGE_ANGLES_Y = np.array(
 # Small helpers
 # -----------------------------------------------------------------------------
 
+
 def sum2(arr: np.ndarray) -> float:
     return float(np.sum(arr))
 
@@ -114,6 +117,7 @@ def _sum2_jit(arr: np.ndarray) -> float:
 # -----------------------------------------------------------------------------
 # Periodic adjacency / neighborhood helpers
 # -----------------------------------------------------------------------------
+
 
 @njit(cache=True, nogil=True)
 def _seed_x_jit(mtemp: np.ndarray) -> np.ndarray:
@@ -292,6 +296,7 @@ def non_local(mtemp: np.ndarray, bonds: int, d_a: float) -> np.ndarray:
 # Initial conditions / metrics
 # -----------------------------------------------------------------------------
 
+
 def initialize_unidirectional_state(
     high: np.ndarray,
     params: PCPParameters,
@@ -324,7 +329,9 @@ def _compute_metrics_jit(
     cell_n: int,
     divide_angles_as_in_script2: bool,
     normalize_magnitude_as_in_paper: bool,
-) -> tuple[float, float, float, float, float, float, float, float, float, float, float, float, float]:
+) -> tuple[
+    float, float, float, float, float, float, float, float, float, float, float, float, float
+]:  # noqa: E501
     y_max, x_max, bonds = fzdmem.shape
 
     allx = 0.0
@@ -445,6 +452,7 @@ def compute_metrics(
 # -----------------------------------------------------------------------------
 # Dynamics
 # -----------------------------------------------------------------------------
+
 
 @njit(cache=True, nogil=True)
 def _adj_amount_inplace(src: np.ndarray, out: np.ndarray) -> None:
@@ -568,10 +576,10 @@ def _run_until_convergence_jit(
                     tmp_mul_1[y, x, b] = fzdmem[y, x, b] * vanglmem_adj[y, x, b]
                     tmp_mul_2[y, x, b] = vanglmem[y, x, b] * fzdmem_adj[y, x, b]
 
-        _non_local_inplace(tmp_mul_1, d_a, nl_pos_fzd)   # nonLocal(fzdmem * vanglmemAdj, Da)
-        _non_local_inplace(tmp_mul_2, d_i, nl_neg_fzd)   # nonLocal(vanglmem * fzdmemAdj, Di)
-        _non_local_inplace(tmp_mul_2, d_a, nl_pos_vangl) # nonLocal(vanglmem * fzdmemAdj, Da)
-        _non_local_inplace(tmp_mul_1, d_i, nl_neg_vangl) # nonLocal(fzdmem * vanglmemAdj, Di)
+        _non_local_inplace(tmp_mul_1, d_a, nl_pos_fzd)  # nonLocal(fzdmem * vanglmemAdj, Da)
+        _non_local_inplace(tmp_mul_2, d_i, nl_neg_fzd)  # nonLocal(vanglmem * fzdmemAdj, Di)
+        _non_local_inplace(tmp_mul_2, d_a, nl_pos_vangl)  # nonLocal(vanglmem * fzdmemAdj, Da)
+        _non_local_inplace(tmp_mul_1, d_i, nl_neg_vangl)  # nonLocal(fzdmem * vanglmemAdj, Di)
 
         convergence = 0.0
 
@@ -643,7 +651,8 @@ def run_until_convergence(
 # I/O
 # -----------------------------------------------------------------------------
 
-def prepare_output_dir(base_dir: Path, dirname: str, source_script: Optional[Path] = None) -> Path:
+
+def prepare_output_dir(base_dir: Path, dirname: str, source_script: Path | None = None) -> Path:
     out_dir = base_dir / dirname
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "Summary").mkdir(exist_ok=True)
