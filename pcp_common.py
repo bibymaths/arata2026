@@ -673,8 +673,10 @@ def prepare_output_dir(base_dir: Path, dirname: str, source_script: Path | None 
 def save_csv(path: Path, arr: np.ndarray) -> None:
     np.savetxt(path, arr, delimiter=",", fmt="%.10g")
 
+
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 OSC8_RE = re.compile(r"\x1b]8;;.*?\x1b\\(.*?)\x1b]8;;\x1b\\", re.DOTALL)
+
 
 def visible_len(text: str) -> int:
     """Return printable width after removing ANSI color and OSC8 hyperlink escapes."""
